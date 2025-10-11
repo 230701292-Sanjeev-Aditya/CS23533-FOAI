@@ -17,6 +17,7 @@ def call_gemini_api(topic, article, query):
     Calls the Gemini API with Google Search Grounding to get cited legal analysis.
     Implements exponential backoff for resilience.
     """
+    # This check remains the primary fail-fast point for the main query
     if not API_KEY:
         st.error("Gemini API Key is missing. Please set the GEMINI_API_KEY environment variable.")
         return None, []
@@ -88,17 +89,18 @@ def call_gemini_api(topic, article, query):
     return None, []
 
 @st.cache_data(ttl=3600) # Cache the result for 1 hour to avoid excessive calls
-def get_amendment_info():
+def get_amendment_info(api_key_for_cache):
     """
     Fetches the current or most recent constitutional amendment information.
-    Uses a highly specific prompt to get a summary from the model with grounding.
+    The API_KEY is explicitly passed to the cached function to ensure it's
+    available during the initial run.
     """
-    if not API_KEY:
+    if not api_key_for_cache:
+        # This branch should now be hit correctly if API_KEY is missing
         return "Amendment info unavailable (API Key missing)."
 
     amendment_query = "What is the most recent significant amendment to the Indian Constitution? Provide the amendment number and a one-sentence summary of its impact."
     
-    # Use a minimal prompt structure for simplicity here
     payload = {
         "contents": [{"parts": [{"text": amendment_query}]}],
         "tools": [{"google_search": {}}], 
@@ -109,17 +111,19 @@ def get_amendment_info():
         response = requests.post(
             API_URL,
             headers={'Content-Type': 'application/json'},
-            params={'key': API_KEY},
+            params={'key': api_key_for_cache}, # Use the passed key
             json=payload,
-            timeout=10 # Use a shorter timeout for this ancillary query
+            timeout=10 
         )
         response.raise_for_status()
         
         result = response.json()
         text = result.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', 'Could not retrieve information.')
         return text
-    except:
-        return "Could not retrieve current amendment info."
+    except requests.exceptions.RequestException as e:
+        return f"Request error: Check your API Key or connection. {e}"
+    except Exception as e:
+        return f"Internal error during parsing: {e}"
 
 
 # --- Frontend/UI Logic ---
@@ -143,9 +147,15 @@ def main():
         st.markdown("---")
         st.subheader("💡 Latest Constitutional Amendment")
         
-        with st.spinner("Fetching current legal updates..."):
-             amendment_summary = get_amendment_info()
+        # FIX: Pass the API_KEY explicitly to the cached function.
+        if API_KEY:
+             with st.spinner("Fetching current legal updates..."):
+                 # Pass the API_KEY as an argument
+                 amendment_summary = get_amendment_info(API_KEY)
              st.info(amendment_summary)
+        else:
+            st.info("Amendment info unavailable (API Key missing).")
+
 
         st.markdown(
             "**DISCLAIMER:** LawXplorer provides legally relevant information and cites sources using Google Search grounding. "
