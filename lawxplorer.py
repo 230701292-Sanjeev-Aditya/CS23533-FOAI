@@ -167,8 +167,8 @@ def get_law_news(api_key_for_cache):
 def main():
     st.set_page_config(page_title="LawXplorer: Indian Constitution Assistant", layout="wide")
 
-    st.title("⚖️ LawXplorer: Indian Constitution Assistant")
-    st.markdown("A specialized AI tool for legal analysis and guidance on the Indian Constitution.")
+    st.title("⚖️ LawXplorer: Law and Compliance Assistant")
+    st.markdown("A specialized AI tool for legal analysis and guidance on the Law and Compliance.")
     st.markdown("---")
 
     # Sidebar for API Key check and AMENDMENT/NEWS INFO
@@ -279,3 +279,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
