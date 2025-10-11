@@ -22,11 +22,13 @@ def call_gemini_api(topic, article, query):
         st.error("Gemini API Key is missing. Please set the GEMINI_API_KEY environment variable.")
         return None, []
 
-    # 1. Build the system prompt to define the AI's persona
+    # 1. Build the system prompt to define the AI's persona and structure the output
     system_prompt = (
         "You are LawXplorer, a specialized AI assistant focused on the Indian Constitution. "
         "Your task is to provide accurate, concise, and professional legal analysis based on your search results. "
-        "Strictly cite all sources used. Summarize the answer in clear, accessible language, and focus primarily on the Indian constitutional context."
+        "Strictly cite all sources used. The response MUST be structured into two sections: "
+        "1. ANALYSIS: A clear, accessible summary of the legal situation. "
+        "2. DEFENSE POINTS: A section titled 'Defense Points' containing bulleted legal arguments, relevant articles, and case laws that can be used to resolve any potential limitations or defend the legal position."
     )
 
     # 2. Build the user prompt
@@ -242,12 +244,24 @@ def main():
                 response_text, sources = call_gemini_api(topic, article, query)
 
             if response_text:
+                # 1. Separate the response into analysis and defense points
+                # Look for the 'Defense Points' header as the split marker
+                parts = response_text.split("Defense Points", 1)
+                analysis_text = parts[0].replace("ANALYSIS:", "").strip()
+                defense_text = f"Defense Points{parts[1].strip()}" if len(parts) > 1 else None
+
                 st.markdown("---")
                 st.subheader("LawXplorer Analysis & Guidance")
                 
                 # Display Analysis
-                st.markdown(response_text)
-                
+                st.markdown(analysis_text)
+
+                # Display Defense Points (New Section)
+                if defense_text:
+                    st.markdown("---")
+                    st.subheader("🛡️ Legal Defense and Resolution Points")
+                    st.markdown(defense_text)
+
                 # Display Sources (Citations)
                 st.markdown("---")
                 st.subheader("📚 Cited Sources (Grounding)")
