@@ -236,7 +236,7 @@ def main():
         height=150
     )
 
-    if st.button("Analyze & Get Guidance", type="success"):
+    if st.button("Analyze & Get Guidance", type="primary"):
         if not query:
             st.warning("Please enter your legal question before analyzing.")
         else:
@@ -279,5 +279,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
