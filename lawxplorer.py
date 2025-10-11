@@ -89,29 +89,29 @@ def call_gemini_api(topic, article, query):
     return None, []
 
 @st.cache_data(ttl=3600) # Cache the result for 1 hour to avoid excessive calls
-def get_amendment_info(api_key_for_cache):
+def get_latest_amendments(api_key_for_cache):
     """
-    Fetches the current or most recent constitutional amendment information.
-    The API_KEY is explicitly passed to the cached function to ensure it's
-    available during the initial run.
+    Fetches the latest 5 constitutional amendments.
     """
     if not api_key_for_cache:
-        # This branch should now be hit correctly if API_KEY is missing
         return "Amendment info unavailable (API Key missing)."
 
-    amendment_query = "What is the most recent significant amendment to the Indian Constitution? Provide the amendment number and a one-sentence summary of its impact."
+    amendment_query = (
+        "List the latest 5 significant amendments to the Indian Constitution. "
+        "For each, provide the amendment number and a concise summary of its impact."
+    )
     
     payload = {
         "contents": [{"parts": [{"text": amendment_query}]}],
         "tools": [{"google_search": {}}], 
-        "systemInstruction": {"parts": [{"text": "You are a concise legal news summarizer. Answer the user's question with only the amendment number and a brief summary. Do not add salutations or extra context."}]},
+        "systemInstruction": {"parts": [{"text": "You are a legal summarizer. Output the list of amendments directly, using a numbered list. Do not add any introductory or concluding sentences."}]},
     }
 
     try:
         response = requests.post(
             API_URL,
             headers={'Content-Type': 'application/json'},
-            params={'key': api_key_for_cache}, # Use the passed key
+            params={'key': api_key_for_cache}, 
             json=payload,
             timeout=10 
         )
@@ -125,6 +125,40 @@ def get_amendment_info(api_key_for_cache):
     except Exception as e:
         return f"Internal error during parsing: {e}"
 
+@st.cache_data(ttl=3600) # Cache the result for 1 hour to avoid excessive calls
+def get_law_news(api_key_for_cache):
+    """
+    Fetches the top legal news headlines in India today.
+    """
+    if not api_key_for_cache:
+        return "Top law news unavailable (API Key missing)."
+
+    news_query = "Summarize the top 3 most significant legal news headlines in India today."
+    
+    payload = {
+        "contents": [{"parts": [{"text": news_query}]}],
+        "tools": [{"google_search": {}}], 
+        "systemInstruction": {"parts": [{"text": "You are a legal news aggregator. Present the 3 headlines as a markdown bulleted list. Do not add any introductory or concluding sentences."}]},
+    }
+
+    try:
+        response = requests.post(
+            API_URL,
+            headers={'Content-Type': 'application/json'},
+            params={'key': api_key_for_cache},
+            json=payload,
+            timeout=10 
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        text = result.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', 'Could not retrieve top news.')
+        return text
+    except requests.exceptions.RequestException as e:
+        return f"Request error: Could not fetch news. {e}"
+    except Exception as e:
+        return f"Internal error during news fetching: {e}"
+
 
 # --- Frontend/UI Logic ---
 
@@ -135,29 +169,41 @@ def main():
     st.markdown("A specialized AI tool for legal analysis and guidance on the Indian Constitution.")
     st.markdown("---")
 
-    # Sidebar for API Key check and AMENDMENT INFO
+    # Sidebar for API Key check and AMENDMENT/NEWS INFO
     with st.sidebar:
         st.header("Configuration & Disclaimer")
+        
+        # Check API Key and display warning if missing (Removed st.success)
         if not API_KEY:
             st.warning("Please set the GEMINI_API_KEY environment variable to use the assistant.")
-        else:
-            st.success("API Key Loaded.")
         
-        # New Amendment Information Block
+        # Latest Amendments Block
         st.markdown("---")
-        st.subheader("💡 Latest Constitutional Amendment")
+        st.subheader("🏛️ Latest 5 Amendments")
         
-        # FIX: Pass the API_KEY explicitly to the cached function.
         if API_KEY:
-             with st.spinner("Fetching current legal updates..."):
+             with st.spinner("Fetching constitutional updates..."):
                  # Pass the API_KEY as an argument
-                 amendment_summary = get_amendment_info(API_KEY)
-             st.info(amendment_summary)
+                 amendment_list = get_latest_amendments(API_KEY)
+             st.markdown(amendment_list)
         else:
             st.info("Amendment info unavailable (API Key missing).")
 
+        # Top Law News Block
+        st.markdown("---")
+        st.subheader("📰 Top Legal News")
+        
+        if API_KEY:
+             with st.spinner("Fetching today's legal headlines..."):
+                 # Pass the API_KEY as an argument
+                 news_list = get_law_news(API_KEY)
+             st.markdown(news_list)
+        else:
+            st.info("Top news unavailable (API Key missing).")
+
 
         st.markdown(
+            "---"
             "**DISCLAIMER:** LawXplorer provides legally relevant information and cites sources using Google Search grounding. "
             "It is for informational purposes only and is **not a substitute for professional legal advice** from a qualified lawyer."
         )
